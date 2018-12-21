@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src='https://api.mapbox.com/mapbox-gl-js/v0.44.2/mapbox-gl.js'></script>
+<link href='https://api.mapbox.com/mapbox-gl-js/v0.44.2/mapbox-gl.css' rel='stylesheet' />
+<style>
+    body { margin:0; padding:0; }
+    #map { position:absolute; top:0; bottom:0; width:100%; }
+    .map-overlay {
+    font:bold 15px/20px 'Proxima nova', Helvetica, sans-serif;
+    position: absolute;
+    width: 25%;
+    top: 0;
+    left: 0;
+    padding: 10px;
+}
+
+.map-overlay .map-overlay-inner {
+    background-color: #fff;
+    box-shadow:0 1px 2px rgba(0, 0, 0, 0.20);
+    border-radius: 3px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.map-overlay label {
+    display: block;
+    margin: 0 0 10px;
+}
+
+.map-overlay input {
+    background-color: transparent;
+    display: inline-block;
+    width: 100%;
+    position: relative;
+    margin: 0;
+    cursor: ew-resize;
+}
+</style>
+
+
+</head>
+
+<body>
+
+<script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v2.3.0/mapbox-gl-geocoder.min.js'></script>
+<link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v2.3.0/mapbox-gl-geocoder.css' type='text/css' />
+
+<div id='map'></div>
+
+<div class='map-overlay top'>
+    <div class='map-overlay-inner'>
+        <label> <span id='slider-value'>Top 1000 rivers</span></label>
+        <input id='slider' type='range' min='20' max='3000' step='20' value='1000' />
+    </div>
+</div>
+
+<script>
+
+mapboxgl.accessToken = 'pk.eyJ1IjoiamFuLXdpbGxlbWQiLCJhIjoiY2ppNXVtNnJlMDR5bTNxbjJmanNsMGNyciJ9.9D3pP-xpyfkRUVcI1yIzUA';
+var map = new mapboxgl.Map({
+container: 'map',
+style: 'mapbox://styles/jan-willemd/cjnd51mrr0cew2rs9v92w6wuy',
+center: [7, 7], // starting position [lng, lat]
+zoom: 2 // starting zoom
+});
+
+var slider = document.getElementById('slider');
+var sliderValue = document.getElementById('slider-value');
+
+map.on('load', function() {
+
+    slider.addEventListener('input', function(e) {
+        map.setFilter('global-top3000', ['<=', 'order', parseInt(e.target.value)]);
+        // Value indicator
+        sliderValue.textContent = 'Top ' + e.target.value + ' rivers';
+        map.setLayoutProperty('global-bas-withplasticload', 'visibility', 'none');
+        map.setLayoutProperty('global-bas-names', 'visibility', 'none');
+    });
+    map.setFilter('global-top3000',['<=', 'order',parseInt(document.getElementById('slider').value)]);
+    map.setLayoutProperty('global-top3000', 'visibility', 'visible');
+
+});
+
+
+
+map.on('click', function(e) {
+  var features = map.queryRenderedFeatures(e.point, {
+    layers: ['global-top3000'] // replace this with the name of the layer
+  })
+  if (typeof features[0].geometry.coordinates === 'undefined'){
+    Popup.remove();
+   }
+
+
+  if (map.getZoom() < 5){
+    map.flyTo({center: features[0].geometry.coordinates, zoom: 6});
+  } else{
+   map.flyTo({center: features[0].geometry.coordinates});
+  }
+
+  new mapboxgl.Popup({offset: [0, -15]})
+      .setLngLat(features[0].geometry.coordinates)
+      .setHTML('<h3>' + features[0].properties.River_name + '</h3>'+ features[0].properties.join_Count + "<br />"  + 'Area: ' + Math.round(0.000001*features[0].properties.join_area).toLocaleString('nl') + ' km2' + "<br />"  + 'Population: ' + Math.round(features[0].properties.pop2015_31).toLocaleString('nl') + "<br />"
+      + 'Plastic load (HKV-calibrated):' + Math.round(features[0].properties["Input-HKV"]) + ' tons/yr' + "<br />" + 'Plastic load (Lebreton):' + Math.round(features[0].properties["Global-inp"]) + ' tons/yr' +  "<br />" + 'Average runoff:' + Number(features[0].properties.Runoff).toFixed(2) + ' [mm/day]' + "<br />"  + 'Ranking (HKV-calibrated): ' + features[0].properties["order-hkv"] + "<br />" + 'Ease of doing business index: ' + features[0].properties["EODB"]  + '/190 ' +  "<br />" + 'Human development index: ' + features[0].properties["HDI"] + '/188' +  "<br />" +  'Global peace index: ' + features[0].properties["GPI"] + '/163' )
+      .addTo(map);
+
+ map.setFilter('global-top3000', ['match', ['get', 'join_Count'], features[0].properties.join_Count, true, false]);
+ sliderValue.textContent = 'All rivers in ' + features[0].properties.join_Count + ' in top 3000';
+
+ map.setFilter('global-bas-withplasticload', ['match', ['get', 'order'], features[0].properties["order-hkv"].toString() , true, false]);
+ map.setLayoutProperty('global-bas-withplasticload', 'visibility', 'visible');
+
+ map.setFilter('global-bas-names', ['match', ['get', 'order'], features[0].properties["order-hkv"].toString() , true, false]);
+ map.setLayoutProperty('global-bas-names', 'visibility', 'visible');
+
+
+ });
+
+ map.on('zoomend', function() {
+     if (map.getZoom() < 4) {
+     map.setFilter('global-top3000',['<=', 'order',parseInt(document.getElementById('slider').value)]);
+     sliderValue.textContent = 'Top ' + parseInt(document.getElementById('slider').value) + ' rivers';
+     map.setLayoutProperty('global-bas-withplasticload', 'visibility', 'none');
+     map.setLayoutProperty('global-bas-names', 'visibility', 'none');
+     }
+ });
+
+ map.addControl(new MapboxGeocoder({
+     accessToken: mapboxgl.accessToken
+
+ }));
+
+</script>
+
+
+</body>
+</html>
