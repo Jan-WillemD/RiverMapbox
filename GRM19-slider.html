@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.52.0/mapbox-gl.js'></script>
+  <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.52.0/mapbox-gl.css' rel='stylesheet' />
+<style>
+    body { margin:0; padding:0; }
+    #map { position:absolute; top:0; bottom:0; width:100%; }
+    .map-overlay {
+    font:bold 15px/20px 'Proxima nova', Helvetica, sans-serif;
+    position: absolute;
+    width: 25%;
+    top: 0;
+    left: 0;
+    padding: 10px;
+}
+
+.map-overlay .map-overlay-inner {
+    background-color: #fff;
+    box-shadow:0 1px 2px rgba(0, 0, 0, 0.20);
+    border-radius: 3px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.map-overlay label {
+    display: block;
+    margin: 0 0 10px;
+}
+
+.map-overlay input {
+    background-color: transparent;
+    display: inline-block;
+    width: 100%;
+    position: relative;
+    margin: 0;
+    cursor: ew-resize;
+}
+</style>
+</head>
+<body>
+
+  <style>
+      #menu {
+          background: #fff;
+          position: absolute;
+          z-index: 1;
+          top: 10px;
+          right: 10px;
+          border-radius: 3px;
+          width: 120px;
+          border: 1px solid rgba(0,0,0,0.4);
+          font-family: 'Open Sans', sans-serif;
+      }
+
+      #menu a {
+          font-size: 13px;
+          color: #404040;
+          display: block;
+          margin: 0;
+          padding: 0;
+          padding: 10px;
+          text-decoration: none;
+          border-bottom: 1px solid rgba(0,0,0,0.25);
+          text-align: center;
+      }
+
+      #menu a:last-child {
+          border: none;
+      }
+
+      #menu a:hover {
+          background-color: #f8f8f8;
+          color: #404040;
+      }
+
+      #menu a.active {
+          background-color: #3887be;
+          color: #ffffff;
+      }
+
+      #menu a.active:hover {
+          background: #3074a4;
+      }
+  </style>
+
+<nav id="menu"></nav>
+<div id='map'></div>
+
+<div class='map-overlay top'>
+    <div class='map-overlay-inner'>
+        <label> <span id='slider-value'>Rivers with outflow larger then: 2000 tons/yr </span></label>
+        <input id='slider' type='range' min='0' max='5000' step='20' value='2000' />
+    </div>
+</div>
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiamFuLXdpbGxlbWQiLCJhIjoiY2ppNXVtNnJlMDR5bTNxbjJmanNsMGNyciJ9.9D3pP-xpyfkRUVcI1yIzUA';
+var map = new mapboxgl.Map({
+container: 'map',
+style: 'mapbox://styles/jan-willemd/cjqqmd9fr4cdb2ro63rcuenkm',
+center: [0, 0], // starting position [lng, lat]
+zoom: 1 // starting zoom
+});
+
+
+// SLIDERS
+var slider = document.getElementById('slider');
+var sliderValue = document.getElementById('slider-value');
+
+// functions
+function ClickZoom(layerID){
+  map.on('click', layerID, function (e) {
+    if (map.getZoom() < 6){
+      map.flyTo({center: e.features[0].geometry.coordinates, zoom: 6});
+    } else if (map.getZoom() == 6){
+     map.flyTo({center: e.features[0].geometry.coordinates, zoom: 12});
+    }
+    else{
+    map.flyTo({center: e.features[0].geometry.coordinates});
+    }
+  });
+}
+
+
+function FilterLayers(x){if (x <10){
+    map.setFilter('global-outflow-1', ['>=', 'Integer_1',  x]);
+    }
+    else if (x >= 10 && x<100  ){
+     map.setFilter('global-outflow-1', ['<', 'Integer_1',  0]);
+     map.setFilter('global-outflow-10', ['>=', 'Integer_1',  x]);
+    }
+
+    else if (x >= 100 && x<1000  ){
+      map.setFilter('global-outflow-1', ['<', 'Integer_1',  0]);
+      map.setFilter('global-outflow-10', ['<', 'Integer_1',  0]);
+      map.setFilter('global-outflow-100', ['>=', 'Integer_1',  x], ['<', 'Integer_1',  1000]);
+        console.log(x)
+    }
+    else if (x >= 1000 && x<10000  ){
+      map.setFilter('global-outflow-1', ['<', 'Integer_1',  0]);
+      map.setFilter('global-outflow-10', ['<', 'Integer_1',  0]);
+      map.setFilter('global-outflow-100', ['<', 'Integer_1',  0]);
+        map.setFilter('global-outflow-1000', ['>=', 'Integer_1',  x]);
+    }
+    else if(x=>10000){
+      map.setFilter('global-outflow-1', ['<', 'Integer_1',  0]);
+      map.setFilter('global-outflow-10', ['<', 'Integer_1',  0]);
+      map.setFilter('global-outflow-100', ['<', 'Integer_1',  0]);
+      map.setFilter('global-outflow-1000', ['<', 'Integer_1',  0]);
+      map.setFilter('global-outflow-10000', ['>=', 'Integer_1',  x]);
+    }
+};
+
+
+
+map.on('load', function() {
+  map.addLayer({
+    "id": "points",
+    "type": "symbol",
+    "source": {
+        "type": "geojson",
+        "data": {
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                  "geometry": {
+                    "type": "Point",
+                    "coordinates": [75,0]
+                },
+                "properties": {
+                    "title": "Note that this model data is still under review!",
+                    "icon": "harbor",
+                    'color': "#F7455D" // red
+                }
+            }]
+        }
+    },
+    "layout": {
+        "icon-image": "{icon}-15",
+        "text-field": "{title}",
+        "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+        "text-size": 25,
+        "text-offset": [0, 0.6],
+        "text-anchor": "top"
+    },
+    "paint": {
+     'text-color': ['get', 'color']
+  }
+});
+
+
+      map.setLayoutProperty('rivers', 'visibility', 'visible');
+
+      slider.addEventListener('input', function(e) {
+      map.setFilter('global-outflow-1',     ['>=', 'Integer_1',  0], ['<', 'Integer_1',  10]);
+      map.setFilter('global-outflow-10',    ['>=', 'Integer_1',  10], ['<', 'Integer_1',  100]);
+      map.setFilter('global-outflow-100',   ['>=', 'Integer_1',  100], ['<', 'Integer_1',  1000]);
+      map.setFilter('global-outflow-1000',  ['>=', 'Integer_1',  1000], ['<', 'Integer_1',  10000]);
+      map.setFilter('global-outflow-10000', ['>=', 'Integer_1',  10000]);
+
+      FilterLayers(parseInt(e.target.value));
+      sliderValue.textContent = 'Rivers with outflow larger then: ' + e.target.value + ' tons/yr';
+    });
+
+    FilterLayers(parseInt(document.getElementById('slider').value))
+
+
+  });
+  // END sliders
+
+  // Center the map on the coordinates of any clicked symbol from the 'symbols' layer.
+  ClickZoom('global-outflow-1');
+  ClickZoom('global-outflow-10');
+  ClickZoom('global-outflow-100');
+  ClickZoom('global-outflow-1000');
+  ClickZoom('global-outflow-10000');
+
+
+// Toggle layers //
+var toggleableLayerIds = ['rivers', 'global-bas-withplasticload4-w-16z6cu'];  // layer names equal to mapbox LAYER names
+var toggleNames = [ 'Rivers', 'Catchments' ];    // any name allowed, for in the toggle box
+
+for (var i = 0; i < toggleableLayerIds.length; i++) {
+    var id = toggleableLayerIds[i];
+
+    var link = document.createElement('a');
+    link.href = '#';
+    link.className = 'active';
+    link.textContent = toggleNames[i];
+    link.id = id;
+    link.onclick = function (e) {
+        var clickedLayer = this.id;
+        e.preventDefault();
+        e.stopPropagation();
+
+        var visibility = map.getLayoutProperty(clickedLayer, 'visibility');
+
+        if (visibility === 'visible') {
+            map.setLayoutProperty(clickedLayer, 'visibility', 'none');
+            this.className = '';
+        } else {
+            this.className = 'active';
+            map.setLayoutProperty(clickedLayer, 'visibility', 'visible');
+        }
+    };
+
+    var layers = document.getElementById('menu');
+    layers.appendChild(link);
+}
+
+</script>
+</body>
+</html>
